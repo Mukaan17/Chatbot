@@ -25,3 +25,7 @@ Thumbs.db
 # Testing
 test_output/
 
+# Environment variables
+.env
+.env.local
+

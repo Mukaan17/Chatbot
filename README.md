@@ -4,6 +4,7 @@ A conversational AI assistant for the Canvas financial app, designed for creativ
 
 ## Features
 
+- **Generative AI Enhancement**: Powered by OpenAI GPT-4o-mini for natural, personalized responses (optional - falls back to static responses)
 - **11 Intent Handlers**: Greeting, thank you, goodbye, about app, invoicing (multi-step), tax jar (multi-step), expenses, payment errors, projects, bank connection, and fallback
 - **Multi-step Conversations**: Guided flows for invoicing and tax jar with follow-up questions
 - **Quick Reply Suggestions**: Context-aware suggestion chips for faster interaction
@@ -38,7 +39,20 @@ A conversational AI assistant for the Canvas financial app, designed for creativ
 pip install -r requirements.txt
 ```
 
-2. Run the Flask server:
+2. (Optional) Enable AI-powered responses:
+   - Get an API key from [OpenAI](https://platform.openai.com/api-keys)
+   - Set environment variable:
+   ```bash
+   export OPENAI_API_KEY="your-api-key-here"
+   ```
+   - Or create a `.env` file (not committed to git):
+   ```
+   OPENAI_API_KEY=your-api-key-here
+   ```
+   
+   **Note**: Without the API key, the chatbot uses static responses (still fully functional).
+
+3. Run the Flask server:
 ```bash
 python app.py
 ```
@@ -103,6 +117,20 @@ Follow the prompts to link your project and deploy.
 1. Push your code to GitHub/GitLab/Bitbucket
 2. Go to [vercel.com](https://vercel.com) and import your repository
 3. Vercel will auto-detect Python and deploy
+
+### Enable AI on Vercel (Optional)
+
+To enable AI-powered responses in production:
+
+1. Go to your Vercel project dashboard
+2. Navigate to **Settings** → **Environment Variables**
+3. Add a new variable:
+   - **Name**: `OPENAI_API_KEY`
+   - **Value**: Your OpenAI API key
+   - **Environment**: Production, Preview, Development (or just Production)
+4. Redeploy your project
+
+**Note**: Without the API key, responses use the static fallback (still fully functional).
 
 ### Verify Deployment
 

@@ -3,12 +3,23 @@
 # @Date:   2025-11-03 14:10:03
 # @Last Modified by:   Mukhil Sundararaj
 # @Last Modified time: 2025-11-03 14:15:43
+import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 
 app = Flask(__name__)
 CORS(app)
+
+# AI Configuration - Set OPENAI_API_KEY environment variable to enable AI
+USE_AI = bool(os.getenv("OPENAI_API_KEY"))
+if USE_AI:
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    except ImportError:
+        USE_AI = False
+        print("Warning: openai package not installed. Install with: pip install openai")
 
 
 def normalize(text: str) -> str:
@@ -82,7 +93,7 @@ def detect_intent(message: str, context_last_intent: str | None = None):
     if any(k in msg for k in ["hello", "hi", "hey"]):
         return "greet", dynamic_greeting()
     if any(k in msg for k in ["thanks", "thank you", "appreciate it"]):
-        return "thank_you", "You're very welcome! Is there anything else I can help you with?"
+        return "thank_you", "You're very welcome! Is there anything else I can help you with today?"
     if any(k in msg for k in ["bye", "goodbye", "see you", "that’s all", "thats all"]):
         return "goodbye", "Glad I could help. Have a great, productive day!"
 
@@ -143,11 +154,18 @@ def detect_intent(message: str, context_last_intent: str | None = None):
             "Your credentials are encrypted and never stored by Canvas.",
         )
 
+    # Financial advice detection - must come before fallback
+    if any(k in msg for k in ["should i", "advice", "recommend", "what should", "is it better", "should i register", "llc", "s-corp", "tax filing", "investment", "invest"]):
+        return (
+            "financial_advice_decline",
+            "As an AI assistant for the Canvas app, I can't provide financial advice, but I can help you organize your business data to discuss with a professional advisor. Would you like help tracking your expenses, invoices, or Tax Jar savings?",
+        )
+
     # Ambiguity clarification
     if "payment" in msg and "expense" not in msg:
         return (
             "clarify_payment",
-            "I can help with that. Are you trying to log a payment you received from a client, or track an expense you paid?",
+            "Got it. Are you trying to log a payment you received from a client, or track an expense you paid?",
         )
 
     return (
@@ -201,11 +219,86 @@ def build_response(intent: str, message: str):
     elif intent == "clarify_payment":
         suggestions = ["Log a client payment", "Track an expense"]
         rationale = "'Payment' can be ambiguous; I asked a clarifying question."
+    elif intent == "financial_advice_decline":
+        suggestions = ["Track expenses", "View Tax Jar", "Contact support"]
+        rationale = "User asked for financial advice; I politely declined and offered to help organize data instead."
     else:
         suggestions = ["Invoices", "Tax Jar", "Expenses"]
         rationale = "Your message didn't match known topics, so I suggested common ones."
 
     return suggestions, rationale, follow_up
+
+
+def generate_ai_response(user_message: str, intent: str, base_response: str, context: dict) -> str:
+    """
+    Generate an enhanced AI response based on detected intent.
+    Falls back to base_response if AI is unavailable or fails.
+    """
+    if not USE_AI:
+        return base_response
+    
+    # Comprehensive system prompt with full persona instructions
+    system_prompt = f"""You are the Canvas Assistant, a friendly, professional, and highly capable AI helper for creative freelancers using the Canvas financial app. Your primary goal is to reduce your user's financial anxiety and administrative overload by providing instant clarity and automating repetitive tasks. You must always act as a calm, clear, and reassuring partner in managing their business finances.
+
+CRITICAL PERSONA RULES:
+
+1. INTERACTION STYLE & TONE:
+   - Be Proactive and Guiding: You are a helpful assistant. If a user logs an expense, suggest they categorize it for tax purposes. If their Tax Jar is behind schedule, gently let them know. This is "Guidance, Not Guesswork."
+   - Clarity Over Clutter: Provide concise, well-structured answers. Use lists and formatting to make key information easy to scan and understand.
+   - Maintain a Calm, Reassuring Tone: Never be alarming or overly casual. Your purpose is to reduce anxiety. Use phrases like "Got it," "Certainly," and "Here's a look at..."
+   - Simplicity is Key: Avoid complex financial jargon. If you must use a term like "net profit," briefly explain what it means in parentheses.
+   - You MUST adhere to a calm, clear, and reassuring tone. Do not use complex financial jargon.
+
+2. PROCEDURAL RULES:
+   - Gather All Information First: For multi-step tasks like creating an invoice or logging an expense, patiently gather all the necessary details from the user before confirming the action.
+   - Always Confirm Actions: After performing an action, always confirm success and the result of the action.
+   - Resolve Ambiguity: If a user's request is unclear (e.g., "Send a reminder"), ask clarifying questions. Do not guess.
+   - When answering questions about features, synthesize information naturally and conversationally. Do not simply output raw text.
+
+3. CRITICAL GUARDRAILS & BOUNDARIES:
+   - You Are NOT a Financial Advisor: This is your most important rule. You MUST NOT give financial advice, investment advice, or specific tax filing advice (e.g., "Should I register as an LLC?"). You can only report on the data within the Canvas app and explain financial concepts generally.
+   - Politely Decline Out-of-Scope Requests: If a user asks for advice, you must politely decline and clarify your role. A good response is: "As an AI assistant for the Canvas app, I can't provide financial advice, but I can help you organize your business data to discuss with a professional advisor."
+   - Provide an Escalation Path: If you cannot fulfill a request, the user is frustrated, or they explicitly ask for a human, you must provide the user with the option to contact human support. The email is support@canvasapp.com.
+
+4. YOUR CAPABILITIES (Context for responses):
+   You can help with:
+   - Dashboard & Financial Overview: Summaries, balances, Tax Jar status, income vs expenses, Action Items, recent transactions
+   - Invoice Management: Create invoices, check status, list by status, log payments, send reminders
+   - Project Management: Create projects, list by status, provide project details
+   - Expense Management: Log expenses, list expenses, show category spending, categorize uncategorized expenses
+   - General Knowledge & Support: Answer questions about Canvas features and general freelance financial concepts
+
+Current Intent: {intent}
+Base Response to Enhance: {base_response}
+
+RESPONSE GENERATION INSTRUCTIONS:
+- Generate a natural, conversational response that matches the intent
+- Preserve the helpful content of the base response
+- Be BRIEF and HIGH-SIGNAL: aim for 1–2 short sentences (≤ 240 characters total)
+- If steps are required, use at most 3 concise bullets or numbered steps
+- Maintain the Canvas voice: calm, supportive, clear, reassuring; no filler
+- Do not invent features or advice; if out-of-scope, decline politely
+- If the user seems anxious, be extra reassuring in one short sentence
+- Prefer plain words over jargon (explain terms briefly if needed)"""
+    
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",  # Cost-effective and fast
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message}
+            ],
+            temperature=0.5,
+            max_tokens=120,
+        )
+        ai_response = response.choices[0].message.content.strip()
+        # Fallback to base if AI response is too short or seems off
+        if len(ai_response) < 10:
+            return base_response
+        return ai_response
+    except Exception as e:
+        print(f"AI generation error: {e}")
+        return base_response  # Fallback to static response
 
 
 @app.post("/api/chat")
@@ -215,7 +308,11 @@ def chat():
     context = data.get("context", {}) or {}
     last_intent = context.get("lastIntent")
 
-    intent, response_text = detect_intent(message, last_intent)
+    intent, base_response = detect_intent(message, last_intent)
+    
+    # Enhance response with AI if available, otherwise use base response
+    response_text = generate_ai_response(message, intent, base_response, context)
+    
     suggestions, rationale, follow_up = build_response(intent, message)
 
     return jsonify(

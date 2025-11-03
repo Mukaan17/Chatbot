@@ -13,14 +13,9 @@ app = Flask(__name__)
 CORS(app)
 
 # AI Configuration - Set OPENAI_API_KEY environment variable to enable AI
+# Lazy-load the OpenAI client inside the request handler to avoid
+# import-time failures on serverless platforms.
 USE_AI = bool(os.getenv("OPENAI_API_KEY"))
-if USE_AI:
-    try:
-        from openai import OpenAI
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    except ImportError:
-        USE_AI = False
-        print("Warning: openai package not installed. Install with: pip install openai")
 
 
 def normalize(text: str) -> str:
@@ -283,6 +278,9 @@ RESPONSE GENERATION INSTRUCTIONS:
 - Prefer plain words over jargon (explain terms briefly if needed)"""
     
     try:
+        # Lazy import and client creation to avoid platform-specific conflicts
+        from openai import OpenAI  # type: ignore
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         response = client.chat.completions.create(
             model="gpt-4o-mini",  # Cost-effective and fast
             messages=[

@@ -4,7 +4,8 @@
 **Course:** CS-GY 6543 - Human-Computer Interaction  
 **NetID:** mg8192  
 **Date:** November 2, 2025  
-**Deployed Application:** https://hci-chatbot-eight.vercel.app/
+**Deployed Application:** https://hci-chatbot-eight.vercel.app/  
+**Figma Design:** https://tinyurl.com/hci-figma-8
 
 ---
 

@@ -4,6 +4,7 @@
 # @Last Modified by:   Mukhil Sundararaj
 # @Last Modified time: 2025-11-03 14:15:43
 import os
+from typing import Optional
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
@@ -37,7 +38,7 @@ def dynamic_greeting() -> str:
         return "Hello! I'm the Canvas Assistant. How can I help you with your freelance finances today?"
 
 
-def detect_intent(message: str, context_last_intent: str | None = None):
+def detect_intent(message: str, context_last_intent: Optional[str] = None):
     msg = normalize(message)
 
     # Follow-up handling for multi-step flows
